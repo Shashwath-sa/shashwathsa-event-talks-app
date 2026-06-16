@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingSkeletons: document.getElementById('loading-skeletons'),
         emptyState: document.getElementById('empty-state'),
         btnResetFilters: document.getElementById('btn-reset-filters'),
+        btnExportCSV: document.getElementById('btn-export-csv'),
         
         // Counters
         countTotal: document.getElementById('count-total'),
@@ -59,6 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchNotes(true);
         }
     });
+
+    // Export CSV button event listener
+    elements.btnExportCSV.addEventListener('click', exportToCSV);
 
     // Reset filters empty state button
     elements.btnResetFilters.addEventListener('click', resetFilters);
@@ -233,6 +237,75 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================================================
+    // EXPORT & UTILS
+    // ==========================================================================
+
+    /**
+     * Escapes cells to create valid double-quoted CSV fields.
+     */
+    function escapeCSVField(field) {
+        if (field === null || field === undefined) return '';
+        let stringValue = String(field);
+        // Escape double quotes by doubling them
+        stringValue = stringValue.replace(/"/g, '""');
+        // Wrap in double quotes if it contains separator characters, quotes, or newlines
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+            return `"${stringValue}"`;
+        }
+        return stringValue;
+    }
+
+    /**
+     * Exports all currently visible filtered release notes to a CSV download.
+     */
+    function exportToCSV() {
+        if (appState.filteredNotes.length === 0) {
+            showToast('No release notes match the active filters to export', 'error');
+            return;
+        }
+
+        // Headers
+        const headers = ['Date', 'Type', 'Content HTML', 'Tweet text', 'Link'];
+        const csvRows = [headers];
+
+        // Build data rows
+        appState.filteredNotes.forEach(day => {
+            day.updates.forEach(update => {
+                csvRows.push([
+                    day.date,
+                    update.type,
+                    update.content_html,
+                    update.tweet_text,
+                    day.link
+                ]);
+            });
+        });
+
+        // Convert to CSV string format
+        const csvContent = csvRows.map(row => row.map(escapeCSVField).join(',')).join('\r\n');
+
+        try {
+            // Generate Blob object and trigger browser download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            
+            const dateStamp = new Date().toISOString().slice(0, 10);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `bigquery_release_notes_${dateStamp}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast('CSV export downloaded successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to export CSV: ', err);
+            showToast('Error exporting CSV file', 'error');
+        }
+    }
+
+    // ==========================================================================
     // RENDERING
     // ==========================================================================
     
@@ -292,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 updateCard.className = `update-card ${typeClass}`;
                 
-                // Card header (Badge and Tweet action)
+                // Card header (Badge and Actions group)
                 const cardHeader = document.createElement('div');
                 cardHeader.className = 'card-header';
                 
@@ -316,17 +389,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 badge.innerHTML = `${badgeIcon} ${update.type}`;
                 cardHeader.appendChild(badge);
                 
+                // Card action buttons group
+                const cardActions = document.createElement('div');
+                cardActions.className = 'card-actions';
+
+                // Copy action button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn-copy-card';
+                copyBtn.innerHTML = `<i class="fa-regular fa-copy"></i> Copy`;
+                copyBtn.setAttribute('aria-label', `Copy this update from ${day.date}`);
+                copyBtn.addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText(update.tweet_text);
+                        showToast('Update copied to clipboard!', 'success');
+                    } catch (err) {
+                        console.error('Failed to copy: ', err);
+                        // Fallback
+                        const el = document.createElement('textarea');
+                        el.value = update.tweet_text;
+                        document.body.appendChild(el);
+                        el.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(el);
+                        showToast('Update copied to clipboard!', 'success');
+                    }
+                });
+
                 // Tweet action button
                 const tweetBtn = document.createElement('button');
                 tweetBtn.className = 'btn-tweet-card';
                 tweetBtn.innerHTML = `<i class="fa-brands fa-x-twitter"></i> Tweet`;
                 tweetBtn.setAttribute('aria-label', `Tweet this update from ${day.date}`);
-                
                 tweetBtn.addEventListener('click', () => {
                     openTweetComposer(update.tweet_text);
                 });
                 
-                cardHeader.appendChild(tweetBtn);
+                cardActions.appendChild(copyBtn);
+                cardActions.appendChild(tweetBtn);
+                cardHeader.appendChild(cardActions);
                 updateCard.appendChild(cardHeader);
                 
                 // Card body content

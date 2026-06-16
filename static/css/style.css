@@ -625,8 +625,14 @@ a:hover {
 .badge.deprecation-badge { background: var(--color-amber-glow); color: var(--color-amber); }
 .badge.general-badge { background: var(--color-primary-glow); color: var(--color-primary); }
 
-/* Tweet Button in Card */
-.btn-tweet-card {
+/* Card Actions Group */
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Tweet & Copy Buttons in Card */
+.btn-tweet-card, .btn-copy-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
@@ -634,13 +640,13 @@ a:hover {
     padding: 0.35rem 0.75rem;
     border-radius: 8px;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     transition: var(--transition-fast);
 }
 
-.btn-tweet-card:hover {
+.btn-tweet-card:hover, .btn-copy-card:hover {
     background: rgba(56, 189, 248, 0.1);
     color: var(--color-primary);
     border-color: var(--color-primary);
